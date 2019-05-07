@@ -14,6 +14,9 @@
 .gitignore
 sample.jpeg
 README.md
-migrate
+.vscode
+cors.json
+*.pyc
+Makefile
 
 !lib/

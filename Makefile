@@ -13,16 +13,14 @@ build:
 
 clean:
 	rm -rf lib
+	rm *.pyc
 
-deploy: cors.json requirements.txt
-	gcloud app deploy --project=exec-trav-images
+deploy: 
+	gcloud app deploy --project=exec-trav-storage -v 1
 
-cors.json: set-cors
+logs:
+	gcloud app logs tail --project=exec-trav-storage
 
-set-cors:
-	@echo Updating CORS rules from
-	@gsutil cors get gs://public.images.executivetraveller.com
-	@echo to
-	@cat cors.json
-	gsutil cors set cors.json gs://public.images.executivetraveller.com
+config:
+	test `gcloud config get-value project 2>/dev/null` = default || gcloud config configurations activate default
 	

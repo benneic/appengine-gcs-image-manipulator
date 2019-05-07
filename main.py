@@ -1,9 +1,16 @@
 import os
 import logging
 from datetime import timedelta
-from functools import update_wrapper
+import binascii
+import collections
+import datetime
+import hashlib
+import sys
 
-from flask import Flask, request, abort, make_response, current_app, MethodView
+from flask import Flask, request, abort, make_response, current_app, jsonify
+from flask.views import MethodView
+
+from six.moves.urllib.parse import quote
 
 from google.appengine.api import images, app_identity
 from google.appengine.ext import blobstore
@@ -41,13 +48,15 @@ SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
 
 
 def make_response_validation_error(param, location='query', message='There was a input validation error', expected='string'):
-    return make_response({
+    response = jsonify({
         "detail": {
             "location": location,
             "param": param,
             "message": message,
             "example": expected
-        }}, 422)
+        }})
+    response.status_code = 422
+    return response
 
 
 class CrossOrigin(MethodView):
@@ -77,13 +86,14 @@ class UploadAPI(CrossOrigin):
     cloud storage bucket.
     """
 
-    def get(self, filepath):
+    def get(self):
         filepath = request.args.get('filepath')
         if not filepath:
             return make_response_validation_error('filepath', message='Parameter filepath is required')
 
+        url = generate_signed_url(BUCKET_UPLOAD, filepath, http_method='PUT')
         
-        pass
+        return url
 
 
 class ImagesAPI(CrossOrigin):
@@ -91,11 +101,11 @@ class ImagesAPI(CrossOrigin):
     # TODO convert to query string with ?filepath=
     # TODO change routes /upload
 
-    def get(self, filepath):
+    def get(self):
         filepath = request.args.get('filepath', '')
         pass
 
-    def post(self, filepath):
+    def post(self):
         """ Create a dynamic serving url
         """
         try:
@@ -111,7 +121,7 @@ class ImagesAPI(CrossOrigin):
             logging.exception('Requires investigation')
             return str(e), 409
 
-    def delete(self, filepath):
+    def delete(self):
         """Delete dynamic url and optionally the original image
         """
         # TODO get the query string and delete file if asked to
@@ -126,12 +136,12 @@ class ImagesAPI(CrossOrigin):
             abort(404)
 
 
-class ImagesAPI(CrossOrigin):
+class FilesAPI(CrossOrigin):
 
     # TODO convert to query string with ?filepath=
     # TODO change routes /upload
 
-    def get(self, filepath):
+    def get(self):
         """ Returns the file urls for the GCS object
 
         Returns: {
@@ -142,7 +152,7 @@ class ImagesAPI(CrossOrigin):
         """
         pass
 
-    def post(self, filepath):
+    def post(self):
         """ Saves file to Google Cloud Storage from upload bucket 
         and generates dynamic serving url
 
@@ -154,18 +164,102 @@ class ImagesAPI(CrossOrigin):
         """
         pass
 
-    def delete(self, filepath):
+    def delete(self):
         """Deletes file from Google Cloud Storage
         """
         pass
 
 
-app.add_url_rule('/upload', view_func=UploadAPI.as_view(), methods=['GET', 'OPTIONS'])
-app.add_url_rule('/image/save', view_func=ImagesAPI.as_view(), methods=['POST', 'OPTIONS'])
-app.add_url_rule('/image/links', view_func=ImagesAPI.as_view(), methods=['GET', 'OPTIONS'])
-app.add_url_rule('/image/delete', view_func=ImagesAPI.as_view(), methods=['DELETE', 'OPTIONS'])
-app.add_url_rule('/file/save', view_func=FilesAPI.as_view(), methods=['POST', 'OPTIONS'])
-app.add_url_rule('/file/links', view_func=FilesAPI.as_view(), methods=['GET', 'OPTIONS'])
-app.add_url_rule('/file/delete', view_func=FilesAPI.as_view(), methods=['DELETE', 'OPTIONS'])
+app.add_url_rule('/upload', view_func=UploadAPI.as_view('get_upload'), methods=['GET', 'OPTIONS'])
+app.add_url_rule('/image/save', view_func=ImagesAPI.as_view('post_image'), methods=['POST', 'OPTIONS'])
+app.add_url_rule('/image/links', view_func=ImagesAPI.as_view('get_image'), methods=['GET', 'OPTIONS'])
+app.add_url_rule('/image/delete', view_func=ImagesAPI.as_view('delete_image'), methods=['DELETE', 'OPTIONS'])
+app.add_url_rule('/file/save', view_func=FilesAPI.as_view('post_file'), methods=['POST', 'OPTIONS'])
+app.add_url_rule('/file/links', view_func=FilesAPI.as_view('get_file'), methods=['GET', 'OPTIONS'])
+app.add_url_rule('/file/delete', view_func=FilesAPI.as_view('delete_file'), methods=['DELETE', 'OPTIONS'])
 
 
+#def generate_signed_url(service_account_file, bucket_name, object_name,
+def generate_signed_url(bucket_name, object_name, http_method='GET', expiration=SIGNED_URL_EXPIRES_SECONDS, query_parameters=None, headers=None):
+
+    if expiration > 604800:
+        print('Expiration Time can\'t be longer than 604800 seconds (7 days).')
+        sys.exit(1)
+
+    escaped_object_name = quote(object_name, safe='')
+    canonical_uri = '/{}/{}'.format(bucket_name, escaped_object_name)
+
+    datetime_now = datetime.datetime.utcnow()
+    request_timestamp = datetime_now.strftime('%Y%m%dT%H%M%SZ')
+    datestamp = datetime_now.strftime('%Y%m%d')
+    
+    #google_credentials = service_account.Credentials.from_service_account_file(service_account_file)
+    #client_email = google_credentials.service_account_email
+
+    client_email = app_identity.get_service_account_name()
+
+    print 'service account name', client_email
+
+    credential_scope = '{}/auto/storage/goog4_request'.format(datestamp)
+    credential = '{}/{}'.format(client_email, credential_scope)
+    
+    if headers is None:
+        headers = dict()
+        
+    headers['host'] = 'storage.googleapis.com'
+
+    canonical_headers = ''
+    ordered_headers = collections.OrderedDict(sorted(headers.items()))
+    for k, v in ordered_headers.items():
+        lower_k = str(k).lower()
+        strip_v = str(v).lower()
+        canonical_headers += '{}:{}\n'.format(lower_k, strip_v)
+            
+    signed_headers = ''
+    for k, _ in ordered_headers.items():
+        lower_k = str(k).lower()
+        signed_headers += '{};'.format(lower_k)
+    signed_headers = signed_headers[:-1]  # remove trailing '&'
+
+    if query_parameters is None:
+        query_parameters = dict()
+        
+    query_parameters['X-Goog-Algorithm'] = 'GOOG4-RSA-SHA256'
+    query_parameters['X-Goog-Credential'] = credential
+    query_parameters['X-Goog-Date'] = request_timestamp
+    query_parameters['X-Goog-Expires'] = expiration
+    query_parameters['X-Goog-SignedHeaders'] = signed_headers
+
+    canonical_query_string = ''
+    ordered_query_parameters = collections.OrderedDict(
+        sorted(query_parameters.items()))
+    for k, v in ordered_query_parameters.items():
+        encoded_k = quote(str(k), safe='')
+        encoded_v = quote(str(v), safe='')
+        canonical_query_string += '{}={}&'.format(encoded_k, encoded_v)
+    canonical_query_string = canonical_query_string[:-1]  # remove trailing '&'
+    
+    canonical_request = '\n'.join([http_method,
+                                   canonical_uri,
+                                   canonical_query_string,
+                                   canonical_headers,
+                                   signed_headers,
+                                   'UNSIGNED-PAYLOAD'])
+
+    canonical_request_hash = hashlib.sha256(canonical_request.encode()).hexdigest()
+
+    string_to_sign = '\n'.join(['GOOG4-RSA-SHA256',
+                                request_timestamp,
+                                credential_scope,
+                                canonical_request_hash])
+
+    #signature = binascii.hexlify(google_credentials.signer.sign(string_to_sign)).decode() 
+    signing_key_name, signature = app_identity.sign_blob(string_to_sign)
+    signature = binascii.hexlify(signature).decode() # not sure if I need to do this?
+    
+    host_name = 'https://storage.googleapis.com'
+    signed_url = '{}{}?{}&X-Goog-Signature={}'.format(host_name, canonical_uri,
+                                                      canonical_query_string,
+                                                      signature)
+
+    return signed_url
