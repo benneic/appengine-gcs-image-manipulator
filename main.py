@@ -1,14 +1,18 @@
 import os
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 import binascii
 import collections
-import datetime
 import hashlib
 import sys
+import random
+import string
+import re
+from unicodedata import normalize
 
-from flask import Flask, request, abort, make_response, current_app, jsonify
+from flask import Flask, request, abort, make_response, current_app, jsonify, g
 from flask.views import MethodView
+from werkzeug.exceptions import HTTPException
 
 from six.moves.urllib.parse import quote
 
@@ -34,7 +38,6 @@ cloudstorage.set_default_retry_params(
 
 app = Flask(__name__)
 
-BUCKET_UPLOAD = os.environ.get('BUCKET_UPLOAD', 'upload.executivetraveller.com')
 BUCKET_IMAGES = os.environ.get('BUCKET_IMAGES', 'images.executivetraveller.com')
 BUCKET_FILES = os.environ.get('BUCKET_FILES', 'files.executivetraveller.com')
 
@@ -47,19 +50,7 @@ ALLOW_ORIGINS = [
 SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
 
 
-def make_response_validation_error(param, location='query', message='There was a input validation error', expected='string'):
-    response = jsonify({
-        "detail": {
-            "location": location,
-            "param": param,
-            "message": message,
-            "example": expected
-        }})
-    response.status_code = 422
-    return response
-
-
-class CrossOrigin(MethodView):
+class BaseUpload(MethodView):
 
     def options(self):
         """ Allow CORS for specific origins
@@ -80,125 +71,218 @@ class CrossOrigin(MethodView):
  
         return resp
 
-
-class UploadAPI(CrossOrigin):
-    """ Generate a signed upload URL that can be used to POST a file to a temporary
-    cloud storage bucket.
-    """
-
     def get(self):
+        """ Creates a signed URL for uploading a image/file object to Google Cloud Storage
+
+        Returns: {
+            "upload": {
+                "method": http_method,
+                "url": signed_url,
+                "timestamp": request_timestamp,
+                "expires": expiration
+            },
+            "object": {
+                "filepath": filepath,
+                "original_url": url
+            }
+        }
+        """
+        filename = request.args.get('filename')
+        if not filename:
+            return make_response_validation_error('filename', message='Parameter filename is required')
+
+        # generate a unique file path for new file uploads
+        # year/month/random/slug.extension
+        datetime_now = datetime.utcnow()
+        salt = random_hash()
+        filename, file_extension = os.path.splitext(filename)
+        slug = slugify(filename)
+        filepath = "{}/{}/{}/{}{}".format(
+            datetime_now.year,
+            datetime_now.strftime('%m'),
+            salt,
+            slug,
+            file_extension
+        )
+
+        http_method = 'PUT'
+        expires = datetime_now + timedelta(seconds=SIGNED_URL_EXPIRES_SECONDS)
+
+        # generate the signed url
+        signed_url = generate_signed_url(self.bucket, filepath, http_method, SIGNED_URL_EXPIRES_SECONDS)
+
+        response = jsonify({
+            "upload": {
+                "method": http_method,
+                "url": signed_url,
+                "expires": expires.isoformat()
+            },
+            "object": self._object_schema(filepath)
+        })
+        return response
+
+    def _object_schema(self, filepath, dynamic_url=None):
+        o = {
+            "filepath": filepath,
+            "original_url": "https://{}/{}".format(self.bucket, filepath),
+            "original_filename": "gs://{}/{}".format(self.bucket, filepath)
+        }
+        if dynamic_url:
+            o['dynamic_url'] = dynamic_url
+        return o
+
+
+class FilesAPI(BaseUpload):
+    bucket = BUCKET_FILES
+
+
+class ImagesAPI(BaseUpload):
+    bucket = BUCKET_IMAGES
+
+    def post(self):
+        """ Create a dynamic serving url
+
+        Returns: {
+            "object": {
+                "filepath": filepath,
+                "original_url": url,
+                "dynamic_url": url
+            }
+        }
+        """
         filepath = request.args.get('filepath')
         if not filepath:
             return make_response_validation_error('filepath', message='Parameter filepath is required')
 
-        url = generate_signed_url(BUCKET_UPLOAD, filepath, http_method='PUT')
-        
-        return url
+        blobstore_filename = u'/gs/{}/{}'.format(self.bucket, filepath)
+        blob_key = blobstore.create_gs_key(blobstore_filename)
 
-
-class ImagesAPI(CrossOrigin):
-
-    # TODO convert to query string with ?filepath=
-    # TODO change routes /upload
-
-    def get(self):
-        filepath = request.args.get('filepath', '')
-        pass
-
-    def post(self):
-        """ Create a dynamic serving url
-        """
         try:
-            url = images.get_serving_url(blob_key, secure_url=True)
-            return url, 201
+            dynamic_url = images.get_serving_url(blob_key, secure_url=True)
+
+            # return the dynamic url with the rest of the object data
+            response = jsonify(_object_schema(filepath, dynamic_url))
+            response.status_code = 201
+            return response
         except images.AccessDeniedError:
-            abort(403)
+            abort_json(403, u"App Engine Images API Access Denied Error. Files has already been deleted from Cloud Storage")
         except images.ObjectNotFoundError:
-            abort(404)
+            abort_json(404, u"App Engine Images API could not find " + filepath + " in Cloud Storage bucket " + self.bucket)
         except images.NotImageError:
-            abort(405)
+            abort_json(405, u"App Engine Images API says " + filepath + " is not an image")
         except (images.TransformationError, images.UnsupportedSizeError, images.LargeImageError) as e:
             logging.exception('Requires investigation')
-            return str(e), 409
+            abort_json(409, str(e))
 
     def delete(self):
-        """Delete dynamic url and optionally the original image
+        """Delete the original file and dynamic serving url if it exists
         """
+        filepath = request.args.get('filepath')
+        if not filepath:
+            return make_response_validation_error('filepath', message='Parameter filepath is required')
+
+        try:
+            cloudstorage.delete(filename)
+        except cloudstorage.AuthorizationError:
+            abort_json(401, "Unauthorized request has been received by GCS.")
+        except cloudstorage.ForbiddenError:
+            abort_json(403, "Cloud Storage Forbidden Error. GCS replies with a 403 error for many reasons, the most common one is due to bucket permission not correctly setup for your app to access.")
+        except cloudstorage.NotFoundError:
+            abort_json(404, filepath + " not found on GCS in bucket " + self.bucket)
+        except cloudstorage.TimeoutError:
+            abort_json(408, 'Remote timed out')
+
         # TODO get the query string and delete file if asked to
         blobstore_filename = u'/gs/{}/{}'.format(bucket_name, filepath)
         blob_key = blobstore.create_gs_key(blobstore_filename)
         try:
             images.delete_serving_url(blob_key)
-            return '', 204
         except images.AccessDeniedError:
-            abort(403)
+            abort_json(403, "App Engine Images API Access Denied Error. Files has already been deleted from Cloud Storage")
         except images.ObjectNotFoundError:
-            abort(404)
+            pass
+
+        return '', 204
 
 
-class FilesAPI(CrossOrigin):
-
-    # TODO convert to query string with ?filepath=
-    # TODO change routes /upload
-
-    def get(self):
-        """ Returns the file urls for the GCS object
-
-        Returns: {
-            "filename": "gs://files.executivetraveller.com/2019/05/hash-my-file-name.jpeg",
-            "original_url": "https://files.executivetraveller.com/2019/05/hash-my-file-name.jpeg",
-            "dynamic_url": "https://googly.img/moo-haa-haa-haa.jpeg",
-        }
-        """
-        pass
-
-    def post(self):
-        """ Saves file to Google Cloud Storage from upload bucket 
-        and generates dynamic serving url
-
-        Returns: {
-            "filename": "gs://files.executivetraveller.com/2019/05/hash-my-file-name.jpeg",
-            "original_url": "https://files.executivetraveller.com/2019/05/hash-my-file-name.jpeg",
-            "dynamic_url": "https://googly.img/moo-haa-haa-haa.jpeg",
-        }
-        """
-        pass
-
-    def delete(self):
-        """Deletes file from Google Cloud Storage
-        """
-        pass
-
-
-app.add_url_rule('/upload', view_func=UploadAPI.as_view('get_upload'), methods=['GET', 'OPTIONS'])
-app.add_url_rule('/image/save', view_func=ImagesAPI.as_view('post_image'), methods=['POST', 'OPTIONS'])
-app.add_url_rule('/image/links', view_func=ImagesAPI.as_view('get_image'), methods=['GET', 'OPTIONS'])
-app.add_url_rule('/image/delete', view_func=ImagesAPI.as_view('delete_image'), methods=['DELETE', 'OPTIONS'])
-app.add_url_rule('/file/save', view_func=FilesAPI.as_view('post_file'), methods=['POST', 'OPTIONS'])
-app.add_url_rule('/file/links', view_func=FilesAPI.as_view('get_file'), methods=['GET', 'OPTIONS'])
+# Add routes to Flask app
+app.add_url_rule('/file/upload', view_func=FilesAPI.as_view('upload_file'), methods=['GET', 'OPTIONS'])
 app.add_url_rule('/file/delete', view_func=FilesAPI.as_view('delete_file'), methods=['DELETE', 'OPTIONS'])
 
+app.add_url_rule('/image/upload', view_func=ImagesAPI.as_view('upload_image'), methods=['GET', 'OPTIONS'])
+app.add_url_rule('/image/dynamic', view_func=ImagesAPI.as_view('get_dynamic'), methods=['POST', 'OPTIONS'])
+app.add_url_rule('/image/delete', view_func=ImagesAPI.as_view('delete_image'), methods=['DELETE', 'OPTIONS'])
 
-#def generate_signed_url(service_account_file, bucket_name, object_name,
-def generate_signed_url(bucket_name, object_name, http_method='GET', expiration=SIGNED_URL_EXPIRES_SECONDS, query_parameters=None, headers=None):
 
+@app.errorhandler(HTTPException)
+def http_exception_handler(error):
+    response = error.get_response()
+    json_response = jsonify({'message': error.description})
+    json_response.status_code = response.status_code
+    return json_response
+
+@app.errorhandler(Exception)
+def uncaught_exception_handler(error):
+    logging.exception(error)
+    json_response = jsonify({'message': str(error)})
+    json_response.status_code = 500
+    return json_response
+
+
+# Helpers
+
+def abort_json(status_code, message):
+    json_response = jsonify({'message': message})
+    json_response.status_code = status_code
+    abort(json_response)
+
+def make_response_validation_error(param, location='query', message='There was a input validation error', expected='string'):
+    response = jsonify({
+        "detail": {
+            "location": location,
+            "param": param,
+            "message": message,
+            "example": expected
+        }})
+    response.status_code = 422
+    return response
+
+
+# Utils
+
+def random_hash(length=6):
+    choices = string.ascii_letters + string.digits
+    return ''.join(random.choice(choices) for i in range(length))
+
+
+_punct_re = re.compile(r'[\r\n\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.]+')
+
+def slugify(text, delim=u'-'):
+    """Generates an slightly worse ASCII-only slug."""
+    result = []
+    for word in _punct_re.split(text.lower()):
+        word = normalize('NFKD', word).encode('ascii', 'ignore')
+        if word:
+            result.append(unicode(word, 'utf-8'))
+    return delim.join(result)
+
+
+# Code below heavily borrowed from here: https://cloud.google.com/storage/docs/access-control/signing-urls-manually
+def generate_signed_url(bucket_name, object_name, http_method, expiration, query_parameters=None, headers=None):
+    """ Generate a signed URL for managing GCS objects using the Cloud Storage V4 signing process.
+    """
     if expiration > 604800:
         print('Expiration Time can\'t be longer than 604800 seconds (7 days).')
-        sys.exit(1)
+        expiration = 604800
 
     escaped_object_name = quote(object_name, safe='')
     canonical_uri = '/{}/{}'.format(bucket_name, escaped_object_name)
 
-    datetime_now = datetime.datetime.utcnow()
+    datetime_now = datetime.utcnow()
     request_timestamp = datetime_now.strftime('%Y%m%dT%H%M%SZ')
     datestamp = datetime_now.strftime('%Y%m%d')
-    
-    #google_credentials = service_account.Credentials.from_service_account_file(service_account_file)
-    #client_email = google_credentials.service_account_email
 
     client_email = app_identity.get_service_account_name()
-
-    print 'service account name', client_email
 
     credential_scope = '{}/auto/storage/goog4_request'.format(datestamp)
     credential = '{}/{}'.format(client_email, credential_scope)
@@ -253,9 +337,8 @@ def generate_signed_url(bucket_name, object_name, http_method='GET', expiration=
                                 credential_scope,
                                 canonical_request_hash])
 
-    #signature = binascii.hexlify(google_credentials.signer.sign(string_to_sign)).decode() 
     signing_key_name, signature = app_identity.sign_blob(string_to_sign)
-    signature = binascii.hexlify(signature).decode() # not sure if I need to do this?
+    signature = binascii.hexlify(signature).decode()
     
     host_name = 'https://storage.googleapis.com'
     signed_url = '{}{}?{}&X-Goog-Signature={}'.format(host_name, canonical_uri,

@@ -12,89 +12,47 @@ This API is used to create dynamic image hosting URLs used for on the fly image 
 
 ## How it works
 
-### PRIVATE UPLOAD
+**Step 1: Get a signed upload URL**
 
-Upload file to a private bucket using signed URL from a browser, then generate a dynamic url from the private bucket.
+Upload file to a private bucket using signed URL from a browser.
 
-**Step 1: Get a signed URL from our back end web server**
+Get a signed URL for a particular file name:
 
-On CakePHP server create a new endpoint for returning a temporarly upload URL that lasts for 60 seconds.
-
-Then call this endpoint with `?filename={path/to/file.jpeg}&md5={hash of the file}`.
-
-Example PHP server code for creating the signed URL:
-```php
-function signedURL($filePathName, $fileMd5) { 
-    $filePathName = '/images.executivetraveller.com/' . $filePathName;
-    $expires = time( ) + 60; // expires in 60 seconds 
-    $privateKey = '-----BEGIN PRIVATE KEY-----\nMIIEv.......etc';
-    $toSign = (
-        "PUT\n" . $fileMd5 . "\n" . 
-        'application/x-www-form-urlencoded' . "\n" . 
-        $expires . "\n" . $filePathName;
-    ); 
-    $signature = '?signature will go here by reference?'; 
-    // openssl_sign return TRUE on success
-    // $signature is by reference https://www.php.net/manual/en/function.openssl-sign.php
-    if (openssl_sign( $toSign, $signature, $privateKey, 'sha256' )) { 
-        $signature = urlencode( base64_encode( $signature ) ); 
-        $signedURL = ('https://storage.googleapis.com/' . $filePathName . 
-            '?GoogleAccessId=images-api%40exec-trav-images.iam.gserviceaccount.com&Expires=' . $expires . '&Signature=' . $signature);
-        return $signedURL;
-  } 
-  error_log('FAILED TO SIGN'); 
-  return null; 
-} 
 ```
-For more info see here: https://cloud.google.com/storage/docs/access-control/signed-urls
+GET https://exec-trav-storage.appspot.com/upload?filepath?{path/to/file.jpeg}
+```
+
 
 
 **Step 2: Browser uploads image directly to private bucket**
 
 Using the signed url and same method using previous step
 
+Make sure you provide correct content-type headers!
+
 ```
-POST https://storage.googleapis.com/public.images.executivetraveller.com/{path/to/file.jpeg}?GoogleAccessId=images-api%40exec-trav-images.iam.gserviceaccount.com&Expires=2019-05-08T00:00:00&Signature=oiv98xgy98fb9fx8hb98rxhb98rxhb9r8xhbyc98fbhc9f8byc98byryb
+PUT https://storage.googleapis.com/upload.executivetraveller.com/sample.jpeg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=exec-trav-storage%40appspot.gserviceaccount.com%2F20190507%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20190507T120129Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=13c2e9a8640bd77495f5ccc465ebc0217b961c9a9196b616bb51543b91359ba6722c148f2ecf421ac274748dd341eeabdab3c6adc8a4a28a946eda334fa75ce9bee6ee5e3ab49be416013b5c49c55ebb5dff624c006261d785b3e87fce8c100b25cb682e0a601967db40248195a65ac36d5fb03ca2c78510df89850f9c9d17cab7ee2db510fa0912369655ebc23c9e621b842be3696f04951ca71930d09e4a7b26acf1f876d5e916db5bd5c95b9f45dfe5d688ffd6eb0b45d86e0020da7af77133c940d1ee410187f0a40ca53706a7bcd4784e7327e46630eda52a36ce9e7eb9216b0518d761868e53c349a21a8a2cdb1586c9150443f642768d3d9501a811f1
 Content-Type: image/jpeg
+Cache-Control: maxage=900
 
 [JPEG-DATA]
 ```
 
 
-**Step 3: Get dynamic URL**
+**Step 3: Move the file from temporary storage to permanent storage and get dynamic link**
 
 Call the images api to generate a dynamic image hosting URL
 
 ```
-GET https://exec-trav-images.appspot.com/{path/to/file.jpeg}
+POST https://exec-trav-storage.appspot.com/image/save?filepath?{path/to/file.jpeg}
 ```
 
 
 **Step 4: Save dynamic URL to database**
 
 
-### Via browser using anonymous uploads and Firebase SDK
-
-Using Anonymous login with Firebase SDK
-
-https://firebase.google.com/docs/storage/
-
-https://github.com/firebase/quickstart-js/blob/master/storage/index.html
 
 
-
-### PUBLIC UPLOAD
-
-Upload file to the private bucket from the browser, then generate a dynamic url while transfering the image from our public GCS bucket to our private bucket.
-
-TODO: Document the steps
-
-### Via back end server
-Upload files from a backend server then generate dynamic urls
-
-See here: https://cloud.google.com/storage/docs/uploading-objects
-
-TODO: Document the steps
 
 # API Spec
 
@@ -109,6 +67,10 @@ The files passed to this API must be valid images with the following extensions 
 - jpg
 - jpeg
 - webp
+
+**GET**
+
+For more info see here: https://cloud.google.com/storage/docs/access-control/signed-urls
 
 **PUT**
 Returns an image serving url for the given GCS image object.
@@ -151,7 +113,7 @@ So we should be prepared to update this stuff at a moments notice when things st
 
 Make sure when doing this again that the correct permissions are set up for this App Engine project to access the other Google Cloud Storage bucket like so:
 
-`gsutil acl ch -u appe-engine-project@appspot.gserviceaccount.com:OWNER gs://other-storage-bucket`
+`gsutil acl ch -u app-engine-project@appspot.gserviceaccount.com:OWNER gs://other-storage-bucket`
 
 For example
 ```
@@ -347,3 +309,14 @@ Hence, I searched internet about JPEG types, and interestingly I've found some s
 I went trying the same v option on other image types, and found that WebP also supported the same kind of customized type, also progressively optimizing the image in weight and quality (but much lesser in quality than JPEG) in the same range between v0 and v3. Unfortunately, I haven't yet found any sources of different WebP types.
 
 Also, it didn't change anything when used on GIFs, but, as the PNG type, you can also combine its options with rj and v3, but you would (of course) lose the GIF animation and quality.
+
+
+
+
+### TODO look at browser file uploads using anonymous uploads and Firebase SDK
+
+Using Anonymous login with Firebase SDK
+
+https://firebase.google.com/docs/storage/
+
+https://github.com/firebase/quickstart-js/blob/master/storage/index.html
