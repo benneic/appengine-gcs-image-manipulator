@@ -1,5 +1,8 @@
 all: build
 
+debug:
+	dev_appserver.py app-debug.yaml
+
 run: requirements.txt
 	dev_appserver.py app.yaml
 

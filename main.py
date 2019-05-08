@@ -11,9 +11,9 @@ import re
 from unicodedata import normalize
 
 from werkzeug.exceptions import HTTPException
-from flask import Flask, request, abort, make_response, current_app, jsonify, g
+from flask import Flask, request, abort, make_response, current_app, jsonify, g, redirect
 from flask.views import MethodView
-app = Flask(__name__)
+
 
 from six.moves.urllib.parse import quote
 
@@ -50,6 +50,61 @@ ALLOW_ORIGINS = [
 
 SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
 
+FILEPATH_HASH_LENGTH = 8
+
+
+### Flask WSGI app
+
+app = Flask(__name__)
+
+
+# Flask Wrappers
+
+@app.before_request
+def before_request_require_ssl():
+    # dont require ssl in debug mode
+    # to enable debug mode set env var FLASK_ENV = development
+    if not app.config['DEBUG'] and not request.is_secure:
+        url = request.url.replace('http://', 'https://', 1)
+        return redirect(url, code=301)
+
+@app.before_request
+def before_request_authenticate():
+    # dont require auth just yet
+    return
+
+    token = request.headers.get('X-Session-Token')
+    if token:
+        # TODO Require some type of token and check session against DB
+        if token == "token":
+            return None
+        abort_json(401, "Invalid X-Session-Token")
+
+    token = request.headers.get('X-Application-Secret')
+    if token:
+        # TODO check against ENV variable?
+        if token == "secret":
+            return None
+        abort_json(401, "Invalid X-Application-Secret")
+
+    abort_json(401, "Please provide authorised credentials")
+
+
+@app.errorhandler(HTTPException)
+def http_exception_handler(error):
+    response = error.get_response()
+    json_response = jsonify({'message': error.description})
+    json_response.status_code = response.status_code
+    return json_response
+
+@app.errorhandler(Exception)
+def uncaught_exception_handler(error):
+    logging.exception(error)
+    json_response = jsonify({'message': str(error)})
+    json_response.status_code = 500
+    return json_response
+
+# Flask Views
 
 class BaseUpload(MethodView):
 
@@ -92,13 +147,18 @@ class BaseUpload(MethodView):
         if not filename:
             return make_response_validation_error('filename', message='Parameter filename is required')
 
-        # generate a unique file path for new file uploads
-        # year/month/random/slug.extension
         datetime_now = datetime.utcnow()
-        salt = random_hash()
+
+        # generate a unique file path for new file uploads
+        # year/month/randomsalt/slug.extension
+
+        salt = random_hash(FILEPATH_HASH_LENGTH)
+
         filename, file_extension = os.path.splitext(filename)
+
         # remove unicode and other rubbish from filename
         slug = slugify(filename)
+
         filepath = "{}/{}/{}/{}{}".format(
             datetime_now.year,
             datetime_now.strftime('%m'),
@@ -212,7 +272,8 @@ class ImagesAPI(BaseUpload):
         return '', 204
 
 
-# Add routes to Flask app
+# Flask Routes
+
 app.add_url_rule('/file/upload', view_func=FilesAPI.as_view('upload_file'), methods=['GET', 'OPTIONS'])
 app.add_url_rule('/file/delete', view_func=FilesAPI.as_view('delete_file'), methods=['DELETE', 'OPTIONS'])
 
@@ -220,29 +281,8 @@ app.add_url_rule('/image/upload', view_func=ImagesAPI.as_view('upload_image'), m
 app.add_url_rule('/image/dynamic', view_func=ImagesAPI.as_view('get_dynamic'), methods=['POST', 'OPTIONS'])
 app.add_url_rule('/image/delete', view_func=ImagesAPI.as_view('delete_image'), methods=['DELETE', 'OPTIONS'])
 
-@app.before_request
-def before_request():
-    # redirect everything to SSL
-    if not request.is_secure:
-        url = request.url.replace('http://', 'https://', 1)
-        return redirect(url, code=301)
 
-@app.errorhandler(HTTPException)
-def http_exception_handler(error):
-    response = error.get_response()
-    json_response = jsonify({'message': error.description})
-    json_response.status_code = response.status_code
-    return json_response
-
-@app.errorhandler(Exception)
-def uncaught_exception_handler(error):
-    logging.exception(error)
-    json_response = jsonify({'message': str(error)})
-    json_response.status_code = 500
-    return json_response
-
-
-# Helpers
+# Flask Helpers
 
 def abort_json(status_code, message):
     json_response = jsonify({'message': message})
@@ -261,10 +301,10 @@ def make_response_validation_error(param, location='query', message='There was a
     return response
 
 
-# Utils
+### Utils
 
 def random_hash(length=6):
-    choices = string.ascii_letters + string.digits
+    choices = string.ascii_lowercase + string.digits
     return ''.join(random.choice(choices) for i in range(length))
 
 
@@ -280,9 +320,9 @@ def slugify(text, delim=u'-'):
     return delim.join(result)
 
 
-# Code below heavily borrowed from here: https://cloud.google.com/storage/docs/access-control/signing-urls-manually
 def generate_signed_url(bucket_name, object_name, http_method, expiration, query_parameters=None, headers=None):
     """ Generate a signed URL for managing GCS objects using the Cloud Storage V4 signing process.
+    Code below heavily borrowed from here: https://cloud.google.com/storage/docs/access-control/signing-urls-manually
     """
     if expiration > 604800:
         print('Expiration Time can\'t be longer than 604800 seconds (7 days).')
