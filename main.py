@@ -10,16 +10,16 @@ import string
 import re
 from unicodedata import normalize
 
+from werkzeug.exceptions import HTTPException
 from flask import Flask, request, abort, make_response, current_app, jsonify, g
 from flask.views import MethodView
-from werkzeug.exceptions import HTTPException
+app = Flask(__name__)
 
 from six.moves.urllib.parse import quote
 
 from google.appengine.api import images, app_identity
 from google.appengine.ext import blobstore
 import cloudstorage
-
 cloudstorage.set_default_retry_params(
     cloudstorage.RetryParams(
         initial_delay=0.2, max_delay=5.0, backoff_factor=2, max_retry_period=15
@@ -36,10 +36,11 @@ cloudstorage.set_default_retry_params(
 # if returned by the Local Development Server
 
 
-app = Flask(__name__)
+BUCKET_IMAGES = 'exec-trav-storage-images'
+BUCKET_FILES = 'exec-trav-storage-files'
 
-BUCKET_IMAGES = os.environ.get('BUCKET_IMAGES', 'images.executivetraveller.com')
-BUCKET_FILES = os.environ.get('BUCKET_FILES', 'files.executivetraveller.com')
+DOMAIN_IMAGES = 'images.executivetraveller.com'
+DOMAIN_FILES = 'files.executivetraveller.com'
 
 ALLOW_ORIGINS = [
     'www.executivetraveller.com',
@@ -96,6 +97,7 @@ class BaseUpload(MethodView):
         datetime_now = datetime.utcnow()
         salt = random_hash()
         filename, file_extension = os.path.splitext(filename)
+        # remove unicode and other rubbish from filename
         slug = slugify(filename)
         filepath = "{}/{}/{}/{}{}".format(
             datetime_now.year,
@@ -124,7 +126,7 @@ class BaseUpload(MethodView):
     def _object_schema(self, filepath, dynamic_url=None):
         o = {
             "filepath": filepath,
-            "original_url": "https://{}/{}".format(self.bucket, filepath),
+            "original_url": "https://{}/{}".format(self.domain, filepath),
             "original_filename": "gs://{}/{}".format(self.bucket, filepath)
         }
         if dynamic_url:
@@ -134,10 +136,12 @@ class BaseUpload(MethodView):
 
 class FilesAPI(BaseUpload):
     bucket = BUCKET_FILES
+    domain = DOMAIN_FILES
 
 
 class ImagesAPI(BaseUpload):
     bucket = BUCKET_IMAGES
+    domain = DOMAIN_IMAGES
 
     def post(self):
         """ Create a dynamic serving url
@@ -161,9 +165,12 @@ class ImagesAPI(BaseUpload):
             dynamic_url = images.get_serving_url(blob_key, secure_url=True)
 
             # return the dynamic url with the rest of the object data
-            response = jsonify(_object_schema(filepath, dynamic_url))
+            response = jsonify({
+                "object": self._object_schema(filepath, dynamic_url)
+            })
             response.status_code = 201
             return response
+
         except images.AccessDeniedError:
             abort_json(403, u"App Engine Images API Access Denied Error. Files has already been deleted from Cloud Storage")
         except images.ObjectNotFoundError:
@@ -213,6 +220,12 @@ app.add_url_rule('/image/upload', view_func=ImagesAPI.as_view('upload_image'), m
 app.add_url_rule('/image/dynamic', view_func=ImagesAPI.as_view('get_dynamic'), methods=['POST', 'OPTIONS'])
 app.add_url_rule('/image/delete', view_func=ImagesAPI.as_view('delete_image'), methods=['DELETE', 'OPTIONS'])
 
+@app.before_request
+def before_request():
+    # redirect everything to SSL
+    if not request.is_secure:
+        url = request.url.replace('http://', 'https://', 1)
+        return redirect(url, code=301)
 
 @app.errorhandler(HTTPException)
 def http_exception_handler(error):
