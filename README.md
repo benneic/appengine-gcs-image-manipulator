@@ -106,6 +106,7 @@ On failure returns:
 
 
 **NOTE**
+
 It's probably not a good idea to depend on any of these options existing forever. Google could remove most of them without notice at any time.
 So we should be prepared to update this stuff at a moments notice when things stop working.
 
@@ -117,8 +118,10 @@ Make sure when doing this again that the correct permissions are set up for this
 
 For example
 ```
-gsutil acl ch -u exec-trav-images@appspot.gserviceaccount.com:OWNER gs://images.executivetraveller.com
+gsutil acl ch -u executive-traveller-storage@appspot.gserviceaccount.com:OWNER gs://exec-trav-images-asia
 ```
+
+Or add Storage Legacy Bucket Owner and Storage Owner permission in the Console UI for the same user.
 
 While testing this application I was receiving a TransformationError exception until I had resolved these permissions. Ensure that the has resource level permissioning, otherwise this is not possible using the new bucket level permissions.
 

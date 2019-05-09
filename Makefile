@@ -19,10 +19,10 @@ clean:
 	rm *.pyc
 
 deploy: 
-	gcloud app deploy --project=exec-trav-storage -v 1
+	gcloud app deploy --project=executive-traveller-storage -v 1
 
 logs:
-	gcloud app logs tail --project=exec-trav-storage
+	gcloud app logs tail --project=executive-traveller-storage
 
 config:
 	test `gcloud config get-value project 2>/dev/null` = default || gcloud config configurations activate default
