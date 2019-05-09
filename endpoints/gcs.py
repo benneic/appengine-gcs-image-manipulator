@@ -35,8 +35,6 @@ SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
 
 FILEPATH_HASH_LENGTH = 8
 
-DYNAMIC_MAX_SIZE = 1600
-
 
 def abort_json(status_code, message):
     json_response = jsonify({'message': message})
@@ -204,7 +202,7 @@ class ImagesAPI(BaseUpload):
 
         try:
 
-            dynamic_url = images.get_serving_url(blob_key, size=DYNAMIC_MAX_SIZE, secure_url=True)
+            dynamic_url = images.get_serving_url(blob_key, secure_url=True)
 
             # return the dynamic url with the rest of the object data
             response = jsonify({
