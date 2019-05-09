@@ -35,6 +35,8 @@ SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
 
 FILEPATH_HASH_LENGTH = 8
 
+DYNAMIC_MAX_SIZE = 1600
+
 
 def abort_json(status_code, message):
     json_response = jsonify({'message': message})
@@ -141,6 +143,36 @@ class BaseUpload(MethodView):
             o['dynamic_url'] = dynamic_url
         return o
 
+    def delete(self):
+        """Delete the original file and dynamic serving url if it exists
+        """
+        filepath = request.args.get('filepath')
+        if not filepath:
+            return make_response_validation_error('filepath', message='Parameter filepath is required')
+
+        try:
+            cloudstorage.delete(filename)
+        except cloudstorage.AuthorizationError:
+            abort_json(401, "Unauthorized request has been received by GCS.")
+        except cloudstorage.ForbiddenError:
+            abort_json(403, "Cloud Storage Forbidden Error. GCS replies with a 403 error for many reasons, the most common one is due to bucket permission not correctly setup for your app to access.")
+        except cloudstorage.NotFoundError:
+            abort_json(404, filepath + " not found on GCS in bucket " + self.bucket)
+        except cloudstorage.TimeoutError:
+            abort_json(408, 'Remote timed out')
+
+        # TODO get the query string and delete file if asked to
+        blobstore_filename = u'/gs/{}/{}'.format(bucket_name, filepath)
+        blob_key = blobstore.create_gs_key(blobstore_filename)
+        try:
+            images.delete_serving_url(blob_key)
+        except images.AccessDeniedError:
+            abort_json(403, "App Engine Images API Access Denied Error. Files has already been deleted from Cloud Storage")
+        except images.ObjectNotFoundError:
+            pass
+
+        return '', 204
+
 
 class FilesAPI(BaseUpload):
     bucket = BUCKET_FILES
@@ -171,7 +203,8 @@ class ImagesAPI(BaseUpload):
         blob_key = blobstore.create_gs_key(blobstore_filename)
 
         try:
-            dynamic_url = images.get_serving_url(blob_key, secure_url=True)
+
+            dynamic_url = images.get_serving_url(blob_key, size=DYNAMIC_MAX_SIZE, secure_url=True)
 
             # return the dynamic url with the rest of the object data
             response = jsonify({
@@ -189,33 +222,3 @@ class ImagesAPI(BaseUpload):
         except (images.TransformationError, images.UnsupportedSizeError, images.LargeImageError) as e:
             logging.exception('Requires investigation')
             abort_json(409, str(e))
-
-    def delete(self):
-        """Delete the original file and dynamic serving url if it exists
-        """
-        filepath = request.args.get('filepath')
-        if not filepath:
-            return make_response_validation_error('filepath', message='Parameter filepath is required')
-
-        try:
-            cloudstorage.delete(filename)
-        except cloudstorage.AuthorizationError:
-            abort_json(401, "Unauthorized request has been received by GCS.")
-        except cloudstorage.ForbiddenError:
-            abort_json(403, "Cloud Storage Forbidden Error. GCS replies with a 403 error for many reasons, the most common one is due to bucket permission not correctly setup for your app to access.")
-        except cloudstorage.NotFoundError:
-            abort_json(404, filepath + " not found on GCS in bucket " + self.bucket)
-        except cloudstorage.TimeoutError:
-            abort_json(408, 'Remote timed out')
-
-        # TODO get the query string and delete file if asked to
-        blobstore_filename = u'/gs/{}/{}'.format(bucket_name, filepath)
-        blob_key = blobstore.create_gs_key(blobstore_filename)
-        try:
-            images.delete_serving_url(blob_key)
-        except images.AccessDeniedError:
-            abort_json(403, "App Engine Images API Access Denied Error. Files has already been deleted from Cloud Storage")
-        except images.ObjectNotFoundError:
-            pass
-
-        return '', 204
