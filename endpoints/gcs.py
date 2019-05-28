@@ -25,6 +25,10 @@ BUCKET_FILES = 'exec-trav-files-asia'
 DOMAIN_IMAGES = 'images.executivetraveller.com'
 DOMAIN_FILES = 'files.executivetraveller.com'
 
+# restrict uploads to these extensions
+EXTENSIONS_IMAGES = ['.webp','.jpg','.jpeg','.png','.gif'] # . must be included for comparrison to splitext()
+EXTENSIONS_FILES = ['.pdf'] # . must be included for comparrison to splitext()
+
 ALLOW_ORIGINS = [
     'www.executivetraveller.com',
     'test.executivetraveller.com',
@@ -32,18 +36,18 @@ ALLOW_ORIGINS = [
 ]
 
 SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
-
 FILEPATH_HASH_LENGTH = 8
 
 
 def abort_json(status_code, message):
-    json_response = jsonify({'message': message})
+    json_response = jsonify({"error":{"kind":"abort", "message": message}})
     json_response.status_code = status_code
     abort(json_response)
 
 def make_response_validation_error(param, location='query', message='There was a input validation error', expected='string'):
     response = jsonify({
-        "detail": {
+        "error": {
+            "kind": "validation",
             "location": location,
             "param": param,
             "message": message,
@@ -98,15 +102,19 @@ class BaseUpload(MethodView):
         datetime_now = datetime.utcnow()
 
         # generate a unique file path for new file uploads
-        # year/month/randomsalt/slug.extension
-
         salt = utils.random_hash(FILEPATH_HASH_LENGTH)
 
+        filename = os.path.basename(filename)
         filename, file_extension = os.path.splitext(filename)
+
+        if file_extension not in self.extensions:
+            message = f"Parameter filename has an invalid extension, please only send {self.extensions}"
+            return make_response_validation_error('filename', message=message)
 
         # remove unicode and other rubbish from filename
         slug = utils.slugify(filename)
 
+        # assemble filepath based on year/month/randomsalt/slug.extension
         filepath = "{}/{}/{}/{}{}".format(
             datetime_now.year,
             datetime_now.strftime('%m'),
@@ -119,7 +127,7 @@ class BaseUpload(MethodView):
         expires = datetime_now + timedelta(seconds=SIGNED_URL_EXPIRES_SECONDS)
 
         # generate the signed url
-        signed_url = generate_gcs_v4_signed_url(self.bucket, filepath, http_method, SIGNED_URL_EXPIRES_SECONDS)
+        signed_url = utils.generate_gcs_v4_signed_url(self.bucket, filepath, http_method, SIGNED_URL_EXPIRES_SECONDS)
 
         response = jsonify({
             "upload": {
@@ -175,11 +183,13 @@ class BaseUpload(MethodView):
 class FilesAPI(BaseUpload):
     bucket = BUCKET_FILES
     domain = DOMAIN_FILES
+    extensions = EXTENSIONS_FILES
 
 
 class ImagesAPI(BaseUpload):
     bucket = BUCKET_IMAGES
     domain = DOMAIN_IMAGES
+    extensions = EXTENSIONS_IMAGES
 
     def post(self):
         """ Create a dynamic serving url

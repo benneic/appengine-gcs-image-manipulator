@@ -1,16 +1,24 @@
 # Image Upload API
-with Dynamic Image Resizing 
+#### with Dynamic Image Resizing 
+
+This API is used to create dynamic image hosting URLs used for on the fly image resizing and CDN hosting.
+It also supports general file uploading.
 
 **Powered by**:
 - Google Cloud Storage
 - Google App Engine with Images API
 - Flask
 
-***TLDR***
+## Table Of Contents
+1. Workflow for images
+2. Intro to Dynamic URL parameters
+3. Full list of Dynamic URL Parameters
+4. Workflow for files
+4. API specification
+5. To Do 
 
-This API is used to create dynamic image hosting URLs used for on the fly image resizing and CDN hosting.
 
-## How it works
+# 1. Image upload workflow
 
 All requests below assume HTTPS and support HTTP/2
 
@@ -37,9 +45,9 @@ EXAMPLE RESPONSE
 
 {
   "object": {
-    "path": "2019/05/sr2h72mc/testing.jpeg",
-    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/testing.jpeg",
-    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/testing.jpeg"
+    "path": "2019/05/sr2h72mc/sample.jpeg",
+    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg",
+    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/sample.jpeg"
   },
   "upload": {
     "expires": "2019-05-09T03:16:58.671744",
@@ -81,7 +89,7 @@ Call the images api to generate a dynamic image hosting URL, using the object pa
 
 EXAMPLE REQUEST
 ```
-> POST /image/dynamic?path=2019%2F05%2Fsr2h72mc%2Ftesting.jpeg HTTP/1.1
+> POST /image/dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg HTTP/1.1
 > Host: storage-api.executivetraveller.com
 > Accept: */*
 
@@ -96,100 +104,34 @@ EXAMPLE RESPONSE
 {
   "object": {
     "dynamic_url": "https://lh3.googleusercontent.com/rYLb3WVrsSeBOiKi9hSDfN2r0ifUfdi8-DIMCmQVSb6d-xXcdYHSYfBUv-AZF_mj1OsK-iq6IPajkfNusm8osGrfM16CsNee6KYeRxN_7WMGSA=s1600",
-    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/testing.jpeg",
-    "path": "2019/05/sr2h72mc/testing.jpeg",
-    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/testing.jpeg"
+    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg",
+    "path": "2019/05/sr2h72mc/sample.jpeg",
+    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/sample.jpeg"
   }
 }
 ```
 
 ### Step 4: Save dynamic URL to database
+In the article or comment forms use the "dynamic_url" or "url" fields as required for the `<img ...>` blocks and database tables.
 
 
 
-# API Spec
-
-See **Serving URL parameters** section below for the features provided by the dynamic sizing service. Also see here for more info on how this works:
-https://cloud.google.com/appengine/docs/standard/python/images/
-
-This application has only two operations that can be performed, **PUT** and **DELETE**. Both require a image in a google cloud storage bucket (currently this is `gs://images.executivetraveller.com`). The bucket must be set up with Owner access for this App Engine project.
-
-The files passed to this API must be valid images with the following extensions (in lower case) with UTF8 encoded file names:
-- gif
-- png
-- jpg
-- jpeg
-- webp
-
-**GET**
-
-For more info see here: https://cloud.google.com/storage/docs/access-control/signed-urls
-
-**PUT**
-Returns an image serving url for the given GCS image object.
-Note: It is safe to call this method more than once for the same GCS image object, the same URL will be returned no matter how many times you call it.
-
-
-```shell
-gsutil cp sample.jpeg gs://images.executivetraveller.com/{path/to/file.jpeg}
-curl -XPUT https://exec-trav-images.appspot.com/{path/to/file.jpeg}
-```
-Returns 201 on Success with URL of dynamic image serving url of the image such as https://lh3.googleusercontent.com/examplestring
-
-On failure returns:
-    - 403 on AccessDeniedError
-    - 404 on ObjectNotFoundError
-    - 405 on NotImageError
-    - 409 on TransformationError, UnsupportedSizeError or LargeImageError
-    - 500 when sommething else happens that needs investigation (here)[https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=exec-trav-images&organizationId=1016752747476]
-
-**DELETE**
-Removes an image serving url for the given GCS image object and makes it no longer accessable. This should be done whenever an image is deleted from the GCS bucket. (In the future this should be done automatically using a cloud function)
-
-```shell
-gsutil cp sample.jpeg gs://images.executivetraveller.com/{path/to/file.jpeg}
-curl -XPUT https://exec-trav-images.appspot.com/{path/to/file.jpeg}
-```
-Returns 204 on Success.
-
-On failure returns:
-    - 403 on AccessDeniedError
-    - 404 on ObjectNotFoundError
-    - 500 when sommething else happens that needs investigation (here)[https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=exec-trav-images&organizationId=1016752747476]
-
-
-**NOTE**
-
-It's probably not a good idea to depend on any of these options existing forever. Google could remove most of them without notice at any time.
-So we should be prepared to update this stuff at a moments notice when things stop working.
-
-## A warning on Google App Engine and Cloud Storage permissions
-
-Make sure when doing this again that the correct permissions are set up for this App Engine project to access the other Google Cloud Storage bucket like so:
-
-`gsutil acl ch -u app-engine-project@appspot.gserviceaccount.com:OWNER gs://other-storage-bucket`
-
-For example
-```
-gsutil acl ch -u executive-traveller-storage@appspot.gserviceaccount.com:OWNER gs://exec-trav-images-asia
-```
-
-Or add Storage Legacy Bucket Owner and Storage Owner permission in the Console UI for the same user.
-
-While testing this application I was receiving a TransformationError exception until I had resolved these permissions. Ensure that the has resource level permissioning, otherwise this is not possible using the new bucket level permissions.
-
-## Serving URL parameters
+# 2. Intro to Dynamic URL parameters
 
 We can effect various image transformations by tacking strings onto the end of an App Engine blob-based image URL, following an = character. Options can be combined by separating them with hyphens, eg.:
 
-http://{image-url}=s200-fh-p-b10-c0xFFFF0000
+http://{dynamic_url}=s200-fh-p-b10-c0xFFFF0000
 or:
 
-http://{image-url}=s200-r90-cc-c0xFF00FF00-fSoften=1,20,0:
+http://{dynamic_url}=s200-r90-cc-c0xFF00FF00-fSoften=1,20,0:
 
 **NOTE MAX SIZE** is 1600px on longest size
 
-### SIZE / CROP
+See here for more info on how this works:
+https://cloud.google.com/appengine/docs/standard/python/images/
+
+
+## SIZE / CROP
 s640 — generates image 640 pixels on largest dimension
 s0 — original size image
 w100 — generates image 100 pixels wide
@@ -203,15 +145,15 @@ cc — generates a circularly cropped image
 ci — square crop to smallest of: width, height, or specified =s parameter
 nu — no-upscaling. Disables resizing an image to larger than its original resolution.
 
-### PAN AND ZOOM
+## PAN AND ZOOM
 x, y, z: — pan and zoom a tiled image. These have no effect on an untiled image or without an authorization parameter of some form (see googleartproject.com).
 
-### ROTATION
+## ROTATION
 fv — flip vertically
 fh — flip horizontally
 r{90, 180, 270} — rotates image 90, 180, or 270 degrees clockwise
 
-### IMAGE FORMAT
+## IMAGE FORMAT
 rj — forces the resulting image to be JPG
 rp — forces the resulting image to be PNG
 rw — forces the resulting image to be WebP
@@ -220,11 +162,11 @@ v{0,1,2,3} — sets image to a different format option (works with JPG and WebP)
 
 Forcing PNG, WebP and GIF outputs can work in combination with circular crops for a transparent background. Forcing JPG can be combined with border color to fill in backgrounds in transparent images.
 
-### ANIMATED GIFs
+## ANIMATED GIFs
 rh — generates an MP4 from the input image
 k — kill animation (generates static image)
 
-### MISC.
+## MISC.
 b10 — add a 10px border to image
 c0xAARRGGBB — set border color, eg. =c0xffff0000 for red
 d — adds header to cause browser download
@@ -233,7 +175,7 @@ l100 — sets JPEG quality to 100% (1-100)
 h — responds with an HTML page containing the image
 g — responds with XML used by Google's pan/zoom
 
-### Filters
+## Filters
 fSoften=1,100,0: - where 100 can go from 0 to 100 to blur the image
 fVignette=1,100,1.4,0,000000 where 100 controls the size of the gradient and 000000 is RRGGBB of the color of the border shadow
 fInvert=0,1 inverts the image regardless of the value provided
@@ -241,19 +183,20 @@ fbw=0,1 makes the image black and white regardless of the value provided
 Unknown Parameters
 These parameters have been seen in use, but their effect is unknown: no, nd, mv
 
-### Caveats
+## Caveats
 Some options (like =l for JPEG quality) do not seem to generate new images. If you change another option (size, etc.) and change the l value, the quality change should be visible. Some options also don't work well together. This is all undocumented by Google, probably with good reason.
 
 
-## Full list of params
+# 3. Full list of Dynamic URL Parameters
 
-Notes:
-
-bool means just add the variable by itself
-int means number after variable name
-string means (potentially complex) string after variable name
-hex means hexidecimal number in format 0x000000 after variable name
+**Note**
+```
+bool   - means just add the variable by itself
+int    - means number after variable name
+string - means (potentially complex) string after variable name
+hex    - means hexidecimal number in format 0x000000 after variable name
 variables are separated by hyphens (-)
+```
 
 ```javascript
 int:  s   ==> Size
@@ -348,31 +291,153 @@ bool: sm  ==> StripMetadata
 int:  cv  ==> FaceCropVersion
 ```
 
-### Detailed v option investigation
+## Detailed v option investigation
 
 Someday, while I was investigating the image response headers, I found an attribute etag with value set to v1. Since I haven't seen any v option yet, I just tried adding it to the image url and it worked! Despite the header attribute value probably has nothing to do with the v option, it helped me to accidentally find it.
 
-#### Investigating how the effect works
+## Investigating how the effect works
 First, I've noticed that setting v0 and not setting v resulted in the same response, which indicates that v0 returns the original image with no v option (just like using s0 on the s option would return the original sizing).
 
 Then, I've noticed that setting v1, v2, and v3 progressively returned an image with a smaller content size (weight), and visually it became poorer. Interestingly, setting v4, v5, etc, didn't continue to optimize it.
 
-#### Investigating what the effect is
+## Investigating what the effect is
 Some other day I tested the same parameters on another image, and found that nothing happened. That was interesting: an option that works for an image and doesn't work for another, so I started testing what was the difference between the images. Reviewing the list of parameters, it came to me that it could be the image type, and indeed it was! The first image type I've tried the v option was JPEG, and the second was PNG. So, I could reproduce the same effect by setting the second one with both rj and v3!
 
 Hence, I searched internet about JPEG types, and interestingly I've found some sources (as you can see here, and here) explaining about 3 types of JPEG: Baseline Standard, Baseline Optimized, and Progressive, perfectly fitting the three variations available within the v options!
 
-#### Investigating when the effect works
+## Investigating when the effect works
 I went trying the same v option on other image types, and found that WebP also supported the same kind of customized type, also progressively optimizing the image in weight and quality (but much lesser in quality than JPEG) in the same range between v0 and v3. Unfortunately, I haven't yet found any sources of different WebP types.
 
 Also, it didn't change anything when used on GIFs, but, as the PNG type, you can also combine its options with rj and v3, but you would (of course) lose the GIF animation and quality.
 
+## NOTE
+
+It's probably not a good idea to depend on any of these options existing forever. Google could remove most of them without notice at any time.
+So we should be prepared to update this stuff at a moments notice when things stop working.
 
 
+# 4. API Specification
 
-### TODO look at browser file uploads using anonymous uploads and Firebase SDK
 
-Using Anonymous login with Firebase SDK
+## GET /image/upload
+## GET /file/upload
+
+```
+curl https://storage-api.executivetraveller.com/image/upload?filename=sample.jpeg
+```
+
+### 200 on Success
+```
+{
+  "object": {
+    "path": "2019/05/sr2h72mc/sample.jpeg",
+    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg",
+    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/sample.jpeg"
+  },
+  "upload": {
+    "expires": "2019-05-09T03:16:58.671744",
+    "method": "PUT",
+    "url": "https://storage.googleapis.com/exec-trav-images-asia/2019%2F05%2Fsr2h72mc%2Ftesting.jpeg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=executive-traveller-storage%40appspot.gserviceaccount.com%2F20190509%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20190509T030158Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=0f9973cb43298536c9cc96284f4bea5b2b3ae295489b257e898b266d0e06068fdd40323f54ab6f69421958f90307e96a3d9bf87ad6429e5a68d861efc1c934a7e18d0c82384695420ce7b18a8c68a6ebd50f607f66844bb6897f79e24ac2462b1b16525d1e29f344b9dbc695c4d19d743cc18a6054d5e124c6d60795eccd8647569fc2db8dd867552657497b544abbf9a6ea64b94eceb940361473c974968483404efcc811eb15566044fbec2882d83eb2be8d39a6f0e7f733f60d84942fd783923401e994a422fd8a638684da1aeaa9f834aea1610f70d49ffb771d40eb8c095639459009ebd3adadcd82977e3b3fd19cfaeb3d17cab62b227bdacbd0240ff4"
+  }
+}
+```
+Then use the upload.url and upload.method to push file directly into cloud storage
+
+### 422 on Validation error
+```
+{
+  "error": {
+    "kind": "validation",
+    "example":"string",
+    "location":"query",
+    "message":"Parameter filename is required",
+    "param":"filename"
+  }
+}
+```
+
+
+## DELETE /image/delete
+## DELETE /file/delete
+Removes an image serving url for the given GCS image object and makes it no longer accessable. This should be done whenever an image is deleted from the GCS bucket. (In the future this should be done automatically using a cloud function)
+
+```shell
+gsutil cp sample.jpeg gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg
+curl -XDELETE https://storage-api.executivetraveller.com/image/dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg
+```
+### 204 on Success
+No response
+
+### On Failure
+On failure returns:
+- 401 on UnauthorisedRequest
+- 403 on AccessDeniedError
+- 404 on ObjectNotFoundError
+- 408 on TimeoutError
+- 500 when sommething else happens that needs investigation (here)[https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=executive-traveller-storage&organizationId=1016752747476]
+
+
+## POST /image/dynamic
+Returns an image serving url for the given GCS image object.
+Note: It is safe to call this method more than once for the same GCS image object, the same URL will be returned no matter how many times you call it.
+
+
+```shell
+gsutil cp sample.jpeg gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg
+curl -XPUT https://storage-api.executivetraveller.com/image/dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg
+```
+
+### 201 on Success
+```
+{
+  "object": {
+    "dynamic_url": "https://lh3.googleusercontent.com/rYLb3WVrsSeBOiKi9hSDfN2r0ifUfdi8-DIMCmQVSb6d-xXcdYHSYfBUv-AZF_mj1OsK-iq6IPajkfNusm8osGrfM16CsNee6KYeRxN_7WMGSA=s1600",
+    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg",
+    "path": "2019/05/sr2h72mc/sample.jpeg",
+    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/sample.jpeg"
+  }
+}
+```
+
+### On Failure
+Multiple errors could occur:
+- 403 on AccessDeniedError
+- 404 on ObjectNotFoundError
+- 405 on NotImageError
+- 409 on TransformationError, UnsupportedSizeError or LargeImageError
+- 500 when sommething else happens that needs investigation (here)[https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=executive-traveller-storage&organizationId=1016752747476]
+```
+{
+  "error": {
+    "kind": "abort",
+    "message":"Parameter filename is required"
+  }
+}
+```
+
+
+## A warning on Google App Engine and Cloud Storage permissions
+
+Make sure when doing this again that the correct permissions are set up for this App Engine project to access the other Google Cloud Storage bucket like so:
+
+`gsutil acl ch -u app-engine-project@appspot.gserviceaccount.com:OWNER gs://other-storage-bucket`
+
+For example
+```
+gsutil acl ch -u executive-traveller-storage@appspot.gserviceaccount.com:OWNER gs://exec-trav-images-asia
+```
+
+Or add Storage Legacy Bucket Owner and Storage Owner permission in the Console UI for the same user.
+
+While testing this application I was receiving a TransformationError exception until I had resolved these permissions. Ensure that the has resource level permissioning, otherwise this is not possible using the new bucket level permissions.
+
+# 4. TODO
+
+## Firebase
+
+Look at authentication all users with Firebase then using Firebase SDK to upload files directly to GCS.
+
+Otherwise if not using Firebase Auth look at allowing uploads from browser using anonymous authentication and Firebase SDK
 
 https://firebase.google.com/docs/storage/
 
