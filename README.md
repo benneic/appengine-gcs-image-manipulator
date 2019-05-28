@@ -321,6 +321,8 @@ So we should be prepared to update this stuff at a moments notice when things st
 
 ## GET /image/upload
 ## GET /file/upload
+Images accepts file extensions: ['.webp','.jpg','.jpeg','.png','.gif']
+Files accepts file extensions: ['.pdf']
 
 ```
 curl https://storage-api.executivetraveller.com/image/upload?filename=sample.jpeg
