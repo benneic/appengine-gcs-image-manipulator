@@ -58,7 +58,7 @@ EXAMPLE RESPONSE
 ```
 
 
-### Step 2: Upload file
+### Step 2: Upload the image
 
 Upload your file, from the browser, using the signed url and method from step 1
 
@@ -374,7 +374,7 @@ On failure returns:
 - 403 on AccessDeniedError
 - 404 on ObjectNotFoundError
 - 408 on TimeoutError
-- 500 when sommething else happens that needs investigation (here)[https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=executive-traveller-storage&organizationId=1016752747476]
+- 500 when sommething else happens that needs investigation [here](https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=executive-traveller-storage&organizationId=1016752747476)
 
 
 ## POST /image/dynamic
@@ -405,7 +405,7 @@ Multiple errors could occur:
 - 404 on ObjectNotFoundError
 - 405 on NotImageError
 - 409 on TransformationError, UnsupportedSizeError or LargeImageError
-- 500 when sommething else happens that needs investigation (here)[https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=executive-traveller-storage&organizationId=1016752747476]
+- 500 when sommething else happens that needs investigation [here](https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=executive-traveller-storage&organizationId=1016752747476)
 ```
 {
   "error": {

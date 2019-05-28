@@ -108,7 +108,7 @@ class BaseUpload(MethodView):
         filename, file_extension = os.path.splitext(filename)
 
         if file_extension not in self.extensions:
-            message = f"Parameter filename has an invalid extension, please only send {self.extensions}"
+            message = "Parameter filename has an invalid extension, please only send {}".format(self.extensions)
             return make_response_validation_error('filename', message=message)
 
         # remove unicode and other rubbish from filename
