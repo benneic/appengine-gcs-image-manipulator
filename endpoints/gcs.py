@@ -27,14 +27,10 @@ EXTENSIONS_IMAGES = ['.webp','.jpg','.jpeg','.png','.gif'] # . must be included 
 EXTENSIONS_FILES = ['.pdf'] # . must be included for comparrison to splitext()
 
 ALLOW_ORIGINS = [
+    '*', # TODO: Remove this when implementing client id and secret
     'www.executivetraveller.com',
     'test.executivetraveller.com',
     'localhost'
-]
-
-# TODO: remove this after testing and implement client id and secret
-ALLOW_ORIGINS = [
-    '*'
 ]
 
 SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
