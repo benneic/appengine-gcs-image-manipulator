@@ -7,6 +7,8 @@ import string
 import re
 from unicodedata import normalize
 
+from six.moves.urllib.parse import quote
+
 from google.appengine.api import app_identity
 
 

@@ -5,9 +5,6 @@ from datetime import timedelta, datetime
 from flask import request, abort, make_response, current_app, jsonify
 from flask.views import MethodView
 
-
-from six.moves.urllib.parse import quote
-
 from google.appengine.api import images, app_identity
 from google.appengine.ext import blobstore
 import cloudstorage
@@ -33,6 +30,11 @@ ALLOW_ORIGINS = [
     'www.executivetraveller.com',
     'test.executivetraveller.com',
     'localhost'
+]
+
+# TODO: remove this after testing and implement client id and secret
+ALLOW_ORIGINS = [
+    '*'
 ]
 
 SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
