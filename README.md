@@ -26,7 +26,7 @@ All requests below assume HTTPS and support HTTP/2
 
 ### Step 1: Get a signed upload URL
 
-To upload a file you will need signed URL to upload it with. 
+To upload a file you will need signed URL to upload it with. So generate one with the `/upload` endpoint.
 
 EXAMPLE REQUEST
 ```
@@ -75,7 +75,7 @@ EXAMPLE REQUEST
 
 [JPEG-DATA]
 ```
-It is a good idea to tell browsers to cache details of images for a while since they will likely not change so Cache-Control: maxage=345600 is 4 days which should be plenty... could do more than that really though.
+It is a good idea to tell browsers to cache details of images for a while since they will likely not change so Cache-Control: maxage=345600 is 4 days but do what works for you...
 
 
 EXAMPLE RESPONSE
@@ -113,9 +113,8 @@ EXAMPLE RESPONSE
 }
 ```
 
-### Step 4: Save dynamic URL to database
-In the article or comment forms use the "dynamic_url" or "url" fields as required for the `<img ...>` blocks and database tables.
-
+### Step 4: Save dynamic URL to you database
+Submit the URL in the form from your browser or whatever mean necessary to keep a record of it.
 
 
 # 2. Intro to Dynamic URL parameters
