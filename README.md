@@ -3,6 +3,10 @@
 
 This API is a proof of concept to showcase how it is essentially possible to get free image transformations powered by the same services that powers Google Photos.
 
+It demonstrates how to:
+- do signed uploads direct from the client to a Google Cloud Storage bucket to optimise for speed (bypassing a webserver or middleware)
+- generate a dynamic url using the Google App Engine Images API
+
 **Uses**:
 - Google Cloud Storage
 - Google App Engine with Images API
