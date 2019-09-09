@@ -6,6 +6,11 @@ libraries:
 - name: ssl
   version: latest
 
+env_variables:
+  GCS_BUCKET: 'you-project-bucket'
+  PUBLIC_DOMAIN: 'cdn.example.com'
+  ALLOW_ORIGINS: 'www.example.com,accounts.example.com'
+
 handlers:
   - url: .*
     script: main.app

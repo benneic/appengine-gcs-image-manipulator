@@ -4,7 +4,9 @@ threadsafe: yes
 
 env_variables:
   FLASK_ENV: development
-
+  GCS_BUCKET: 'you-project-bucket'
+  PUBLIC_DOMAIN: 'cdn.example.com'
+  ALLOW_ORIGINS: '*'
 
 libraries:
 - name: ssl

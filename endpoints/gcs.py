@@ -11,27 +11,19 @@ import cloudstorage
 cloudstorage.set_default_retry_params(
     cloudstorage.RetryParams(
         initial_delay=0.2, max_delay=5.0, backoff_factor=2, max_retry_period=15
-        ))
+    )
+)
 
 from . import utils
 
 
-BUCKET_IMAGES = 'exec-trav-images-asia'
-BUCKET_FILES = 'exec-trav-files-asia'
-
-DOMAIN_IMAGES = 'images.executivetraveller.com'
-DOMAIN_FILES = 'files.executivetraveller.com'
+GCS_BUCKET = os.environ['GCS_BUCKET']
+PUBLIC_DOMAIN = os.environ['PUBLIC_DOMAIN']
+ALLOW_ORIGINS = os.environ['ALLOW_ORIGINS'].split(',')
 
 # restrict uploads to these extensions
-EXTENSIONS_IMAGES = ['.webp','.jpg','.jpeg','.png','.gif'] # . must be included for comparrison to splitext()
-EXTENSIONS_FILES = ['.pdf'] # . must be included for comparrison to splitext()
-
-ALLOW_ORIGINS = [
-    '*', # TODO: Remove this when implementing client id and secret
-    'www.executivetraveller.com',
-    'test.executivetraveller.com',
-    'localhost'
-]
+# . must be included for comparrison to splitext()
+EXTENSIONS = ['.webp','.jpg','.jpeg','.png','.gif'] 
 
 SIGNED_URL_EXPIRES_SECONDS = 900 # 15 minutes
 FILEPATH_HASH_LENGTH = 8
@@ -55,26 +47,32 @@ def make_response_validation_error(param, location='query', message='There was a
     return response
 
 
+def add_cors_headers(response):
+    # Allow our origins (can be multiple)
+    response.headers.extend([('Access-Control-Allow-Origin', origin) for origin in ALLOW_ORIGINS])
+    # Allow the actual method
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE'
+    # Allow for 60 seconds
+    response.headers['Access-Control-Max-Age'] = "60"
+    # Allow sending of cookie and http auth headers
+    response.headers['Access-Control-Allow-Credentials'] = "true"
+
+    # 'preflight' request contains the non-standard headers the real request will have (like X-Api-Key)
+    # NOTE we can filter out headers we dont want to allow here if we wanted to
+    request_headers = request.headers.get('Access-Control-Request-Headers')
+    if request_headers:
+        response.headers['Access-Control-Allow-Headers'] = request_headers
+    
+    return response
+
+
 class BaseUpload(MethodView):
 
     def options(self):
         """ Allow CORS for specific origins
         """
         resp = current_app.make_default_options_response()
-        # Allow our origins (can be multiple)
-        resp.headers.extend([('Access-Control-Allow-Origin', origin) for origin in ALLOW_ORIGINS])
-        # Allow the actual method
-        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE'
-        # Allow for 60 seconds
-        resp.headers['Access-Control-Max-Age'] = "60"
-
-        # 'preflight' request contains the non-standard headers the real request will have (like X-Api-Key)
-        # NOTE we can filter out headers we dont want to allow here if we wanted to
-        request_headers = request.headers.get('Access-Control-Request-Headers')
-        if request_headers:
-            resp.headers['Access-Control-Allow-Headers'] = request_headers
- 
-        return resp
+        return add_cors_headers(response)
 
     def get(self):
         """ Creates a signed URL for uploading a image/file object to Google Cloud Storage
@@ -135,7 +133,7 @@ class BaseUpload(MethodView):
             },
             "object": self._object_schema(filepath)
         })
-        return response
+        return add_cors_headers(response)
 
     def _object_schema(self, filepath, dynamic_url=None):
         o = {
@@ -178,16 +176,10 @@ class BaseUpload(MethodView):
         return '', 204
 
 
-class FilesAPI(BaseUpload):
-    bucket = BUCKET_FILES
-    domain = DOMAIN_FILES
-    extensions = EXTENSIONS_FILES
-
-
 class ImagesAPI(BaseUpload):
-    bucket = BUCKET_IMAGES
-    domain = DOMAIN_IMAGES
-    extensions = EXTENSIONS_IMAGES
+    bucket = GCS_BUCKET
+    domain = PUBLIC_DOMAIN
+    extensions = EXTENSIONS
 
     def post(self):
         """ Create a dynamic serving url
@@ -217,7 +209,7 @@ class ImagesAPI(BaseUpload):
                 "object": self._object_schema(filepath, dynamic_url)
             })
             response.status_code = 201
-            return response
+            return add_cors_headers(response)
 
         except images.AccessDeniedError:
             abort_json(403, u"App Engine Images API Access Denied Error. Files has already been deleted from Cloud Storage")

@@ -1,10 +1,9 @@
-# Image Upload API
-#### with Dynamic Image Resizing 
+# Image Manipulator
+#### Dynamic Image Resizing powered by Google App Engine, Google Storage and Flask
 
-This API is used to create dynamic image hosting URLs used for on the fly image resizing and CDN hosting.
-It also supports general file uploading.
+This API is a proof of concept to showcase how it is essentially possible to get free image transformations powered by the same services that powers Google Photos.
 
-**Powered by**:
+**Uses**:
 - Google Cloud Storage
 - Google App Engine with Images API
 - Flask
@@ -12,8 +11,7 @@ It also supports general file uploading.
 ## Table Of Contents
 1. Workflow for images
 2. Intro to Dynamic URL parameters
-3. Full list of Dynamic URL Parameters
-4. Workflow for files
+3. Full list of Dynamic URL Parameters provided by Images API
 4. API specification
 5. To Do 
 
@@ -28,8 +26,8 @@ To upload a file you will need signed URL to upload it with.
 
 EXAMPLE REQUEST
 ```
-> GET /image/upload?filename=sample.jpeg HTTP/1.1
-> Host: storage-api.executivetraveller.com
+> GET /upload?filename=sample.jpeg HTTP/1.1
+> Host: appengine-gcs-image-manipulator.appspot.com
 > Accept: */*
 
 [NO-BODY]
@@ -46,13 +44,13 @@ EXAMPLE RESPONSE
 {
   "object": {
     "path": "2019/05/sr2h72mc/sample.jpeg",
-    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg",
-    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/sample.jpeg"
+    "location": "gs://your-storage-bucket/2019/05/sr2h72mc/sample.jpeg",
+    "url": "https://yourcdn.example.com/2019/05/sr2h72mc/sample.jpeg"
   },
   "upload": {
     "expires": "2019-05-09T03:16:58.671744",
     "method": "PUT",
-    "url": "https://storage.googleapis.com/exec-trav-images-asia/2019%2F05%2Fsr2h72mc%2Ftesting.jpeg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=executive-traveller-storage%40appspot.gserviceaccount.com%2F20190509%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20190509T030158Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=0f9973cb43298536c9cc96284f4bea5b2b3ae295489b257e898b266d0e06068fdd40323f54ab6f69421958f90307e96a3d9bf87ad6429e5a68d861efc1c934a7e18d0c82384695420ce7b18a8c68a6ebd50f607f66844bb6897f79e24ac2462b1b16525d1e29f344b9dbc695c4d19d743cc18a6054d5e124c6d60795eccd8647569fc2db8dd867552657497b544abbf9a6ea64b94eceb940361473c974968483404efcc811eb15566044fbec2882d83eb2be8d39a6f0e7f733f60d84942fd783923401e994a422fd8a638684da1aeaa9f834aea1610f70d49ffb771d40eb8c095639459009ebd3adadcd82977e3b3fd19cfaeb3d17cab62b227bdacbd0240ff4"
+    "url": "https://storage.googleapis.com/your-storage-bucket/2019%2F05%2Fsr2h72mc%2Ftesting.jpeg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=executive-traveller-storage%40appspot.gserviceaccount.com%2F20190509%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20190509T030158Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=0f9973cb43298536c9cc96284f4bea5b2b3ae295489b257e898b266d0e06068fdd40323f54ab6f69421958f90307e96a3d9bf87ad6429e5a68d861efc1c934a7e18d0c82384695420ce7b18a8c68a6ebd50f607f66844bb6897f79e24ac2462b1b16525d1e29f344b9dbc695c4d19d743cc18a6054d5e124c6d60795eccd8647569fc2db8dd867552657497b544abbf9a6ea64b94eceb940361473c974968483404efcc811eb15566044fbec2882d83eb2be8d39a6f0e7f733f60d84942fd783923401e994a422fd8a638684da1aeaa9f834aea1610f70d49ffb771d40eb8c095639459009ebd3adadcd82977e3b3fd19cfaeb3d17cab62b227bdacbd0240ff4"
   }
 }
 ```
@@ -66,7 +64,7 @@ Upload your file, from the browser, using the signed url and method from step 1
 
 EXAMPLE REQUEST
 ```
-> PUT /exec-trav-images-asia/2019%2F05%2Fsr2h72mc%2Ftesting.jpeg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=executive-traveller-storage%40appspot.gserviceaccount.com%2F20190509%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20190509T030158Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=0f9973cb43298536c9cc96284f4bea5b2b3ae295489b257e898b266d0e06068fdd40323f54ab6f69421958f90307e96a3d9bf87ad6429e5a68d861efc1c934a7e18d0c82384695420ce7b18a8c68a6ebd50f607f66844bb6897f79e24ac2462b1b16525d1e29f344b9dbc695c4d19d743cc18a6054d5e124c6d60795eccd8647569fc2db8dd867552657497b544abbf9a6ea64b94eceb940361473c974968483404efcc811eb15566044fbec2882d83eb2be8d39a6f0e7f733f60d84942fd783923401e994a422fd8a638684da1aeaa9f834aea1610f70d49ffb771d40eb8c095639459009ebd3adadcd82977e3b3fd19cfaeb3d17cab62b227bdacbd0240ff4  HTTP/1.1
+> PUT /your-storage-bucket/2019%2F05%2Fsr2h72mc%2Ftesting.jpeg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=executive-traveller-storage%40appspot.gserviceaccount.com%2F20190509%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20190509T030158Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=0f9973cb43298536c9cc96284f4bea5b2b3ae295489b257e898b266d0e06068fdd40323f54ab6f69421958f90307e96a3d9bf87ad6429e5a68d861efc1c934a7e18d0c82384695420ce7b18a8c68a6ebd50f607f66844bb6897f79e24ac2462b1b16525d1e29f344b9dbc695c4d19d743cc18a6054d5e124c6d60795eccd8647569fc2db8dd867552657497b544abbf9a6ea64b94eceb940361473c974968483404efcc811eb15566044fbec2882d83eb2be8d39a6f0e7f733f60d84942fd783923401e994a422fd8a638684da1aeaa9f834aea1610f70d49ffb771d40eb8c095639459009ebd3adadcd82977e3b3fd19cfaeb3d17cab62b227bdacbd0240ff4  HTTP/1.1
 > Host: storage.googleapis.com
 > Content-Type: image/jpeg
 > Cache-Control: maxage=345600
@@ -89,8 +87,8 @@ Call the images api to generate a dynamic image hosting URL, using the object pa
 
 EXAMPLE REQUEST
 ```
-> POST /image/dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg HTTP/1.1
-> Host: storage-api.executivetraveller.com
+> POST /dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg HTTP/1.1
+> Host: appengine-gcs-image-manipulator.appspot.com
 > Accept: */*
 
 [NO-BODY]
@@ -104,9 +102,9 @@ EXAMPLE RESPONSE
 {
   "object": {
     "dynamic_url": "https://lh3.googleusercontent.com/rYLb3WVrsSeBOiKi9hSDfN2r0ifUfdi8-DIMCmQVSb6d-xXcdYHSYfBUv-AZF_mj1OsK-iq6IPajkfNusm8osGrfM16CsNee6KYeRxN_7WMGSA=s1600",
-    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg",
+    "location": "gs://your-storage-bucket/2019/05/sr2h72mc/sample.jpeg",
     "path": "2019/05/sr2h72mc/sample.jpeg",
-    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/sample.jpeg"
+    "url": "https://yourcdn.example.com/2019/05/sr2h72mc/sample.jpeg"
   }
 }
 ```
@@ -319,13 +317,12 @@ So we should be prepared to update this stuff at a moments notice when things st
 # 4. API Specification
 
 
-## GET /image/upload
-## GET /file/upload
+## GET /upload
 Images accepts file extensions: ['.webp','.jpg','.jpeg','.png','.gif']
 Files accepts file extensions: ['.pdf']
 
 ```
-curl https://storage-api.executivetraveller.com/image/upload?filename=sample.jpeg
+curl https://appengine-gcs-image-manipulator.appspot.com/upload?filename=sample.jpeg
 ```
 
 ### 200 on Success
@@ -333,13 +330,13 @@ curl https://storage-api.executivetraveller.com/image/upload?filename=sample.jpe
 {
   "object": {
     "path": "2019/05/sr2h72mc/sample.jpeg",
-    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg",
-    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/sample.jpeg"
+    "location": "gs://your-storage-bucket/2019/05/sr2h72mc/sample.jpeg",
+    "url": "https://yourcdn.example.com/2019/05/sr2h72mc/sample.jpeg"
   },
   "upload": {
     "expires": "2019-05-09T03:16:58.671744",
     "method": "PUT",
-    "url": "https://storage.googleapis.com/exec-trav-images-asia/2019%2F05%2Fsr2h72mc%2Ftesting.jpeg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=executive-traveller-storage%40appspot.gserviceaccount.com%2F20190509%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20190509T030158Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=0f9973cb43298536c9cc96284f4bea5b2b3ae295489b257e898b266d0e06068fdd40323f54ab6f69421958f90307e96a3d9bf87ad6429e5a68d861efc1c934a7e18d0c82384695420ce7b18a8c68a6ebd50f607f66844bb6897f79e24ac2462b1b16525d1e29f344b9dbc695c4d19d743cc18a6054d5e124c6d60795eccd8647569fc2db8dd867552657497b544abbf9a6ea64b94eceb940361473c974968483404efcc811eb15566044fbec2882d83eb2be8d39a6f0e7f733f60d84942fd783923401e994a422fd8a638684da1aeaa9f834aea1610f70d49ffb771d40eb8c095639459009ebd3adadcd82977e3b3fd19cfaeb3d17cab62b227bdacbd0240ff4"
+    "url": "https://storage.googleapis.com/your-storage-bucket/2019%2F05%2Fsr2h72mc%2Ftesting.jpeg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=executive-traveller-storage%40appspot.gserviceaccount.com%2F20190509%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20190509T030158Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=0f9973cb43298536c9cc96284f4bea5b2b3ae295489b257e898b266d0e06068fdd40323f54ab6f69421958f90307e96a3d9bf87ad6429e5a68d861efc1c934a7e18d0c82384695420ce7b18a8c68a6ebd50f607f66844bb6897f79e24ac2462b1b16525d1e29f344b9dbc695c4d19d743cc18a6054d5e124c6d60795eccd8647569fc2db8dd867552657497b544abbf9a6ea64b94eceb940361473c974968483404efcc811eb15566044fbec2882d83eb2be8d39a6f0e7f733f60d84942fd783923401e994a422fd8a638684da1aeaa9f834aea1610f70d49ffb771d40eb8c095639459009ebd3adadcd82977e3b3fd19cfaeb3d17cab62b227bdacbd0240ff4"
   }
 }
 ```
@@ -359,13 +356,12 @@ Then use the upload.url and upload.method to push file directly into cloud stora
 ```
 
 
-## DELETE /image/delete
-## DELETE /file/delete
+## DELETE /delete
 Removes an image serving url for the given GCS image object and makes it no longer accessable. This should be done whenever an image is deleted from the GCS bucket. (In the future this should be done automatically using a cloud function)
 
 ```shell
-gsutil cp sample.jpeg gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg
-curl -XDELETE https://storage-api.executivetraveller.com/image/dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg
+gsutil cp sample.jpeg gs://your-storage-bucket/2019/05/sr2h72mc/sample.jpeg
+curl -XDELETE https://appengine-gcs-image-manipulator.appspot.com/dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg
 ```
 ### 204 on Success
 No response
@@ -379,14 +375,14 @@ On failure returns:
 - 500 when sommething else happens that needs investigation [here](https://console.cloud.google.com/errors?service=default&version&time=P1D&order=LAST_SEEN_DESC&resolution=OPEN&project=executive-traveller-storage&organizationId=1016752747476)
 
 
-## POST /image/dynamic
+## POST /dynamic
 Returns an image serving url for the given GCS image object.
 Note: It is safe to call this method more than once for the same GCS image object, the same URL will be returned no matter how many times you call it.
 
 
 ```shell
-gsutil cp sample.jpeg gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg
-curl -XPUT https://storage-api.executivetraveller.com/image/dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg
+gsutil cp sample.jpeg gs://your-storage-bucket/2019/05/sr2h72mc/sample.jpeg
+curl -XPUT https://appengine-gcs-image-manipulator.appspot.com/dynamic?path=2019%2F05%2Fsr2h72mc%2Fsample.jpeg
 ```
 
 ### 201 on Success
@@ -394,9 +390,9 @@ curl -XPUT https://storage-api.executivetraveller.com/image/dynamic?path=2019%2F
 {
   "object": {
     "dynamic_url": "https://lh3.googleusercontent.com/rYLb3WVrsSeBOiKi9hSDfN2r0ifUfdi8-DIMCmQVSb6d-xXcdYHSYfBUv-AZF_mj1OsK-iq6IPajkfNusm8osGrfM16CsNee6KYeRxN_7WMGSA=s1600",
-    "location": "gs://exec-trav-images-asia/2019/05/sr2h72mc/sample.jpeg",
+    "location": "gs://your-storage-bucket/2019/05/sr2h72mc/sample.jpeg",
     "path": "2019/05/sr2h72mc/sample.jpeg",
-    "url": "https://images.executivetraveller.com/2019/05/sr2h72mc/sample.jpeg"
+    "url": "https://yourcdn.example.com/2019/05/sr2h72mc/sample.jpeg"
   }
 }
 ```
@@ -426,14 +422,16 @@ Make sure when doing this again that the correct permissions are set up for this
 
 For example
 ```
-gsutil acl ch -u executive-traveller-storage@appspot.gserviceaccount.com:OWNER gs://exec-trav-images-asia
+gsutil acl ch -u executive-traveller-storage@appspot.gserviceaccount.com:OWNER gs://your-storage-bucket
 ```
 
 Or add Storage Legacy Bucket Owner and Storage Owner permission in the Console UI for the same user.
 
 While testing this application I was receiving a TransformationError exception until I had resolved these permissions. Ensure that the has resource level permissioning, otherwise this is not possible using the new bucket level permissions.
 
-# 4. TODO
+# 5. TODO
+
+Add API tokens and AUTH.
 
 ## Firebase
 

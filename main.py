@@ -9,7 +9,7 @@ from endpoints.gcs import ImagesAPI, FilesAPI
 # TLDR; make run
 # It is not possible to run this Flask app locally as it depends on libraries and 
 # functionality only available in Google App Engine environment
-# For testing please use the GAE Local Development Server (dev_appserver.py)
+# For testing use the GAE Local Development Server (dev_appserver.py)
 # https://cloud.google.com/appengine/docs/standard/python/tools/using-local-server
 # See Makefile run command
 # Also note that dynamic urls returned by get_serving_url() will not by dynamic
@@ -20,12 +20,10 @@ from endpoints.gcs import ImagesAPI, FilesAPI
 
 app = Flask(__name__)
 
-app.add_url_rule('/image/upload', view_func=ImagesAPI.as_view('upload_image'), methods=['GET', 'OPTIONS'])
-app.add_url_rule('/image/dynamic', view_func=ImagesAPI.as_view('get_dynamic'), methods=['POST', 'OPTIONS'])
-app.add_url_rule('/image/delete', view_func=ImagesAPI.as_view('delete_image'), methods=['DELETE', 'OPTIONS'])
+app.add_url_rule('/upload', view_func=ImagesAPI.as_view('request_upload'), methods=['GET', 'OPTIONS'])
+app.add_url_rule('/dynamic', view_func=ImagesAPI.as_view('generate_dynamic'), methods=['POST', 'OPTIONS'])
+app.add_url_rule('/delete', view_func=ImagesAPI.as_view('delete_image'), methods=['DELETE', 'OPTIONS'])
 
-app.add_url_rule('/file/upload', view_func=FilesAPI.as_view('upload_file'), methods=['GET', 'OPTIONS'])
-app.add_url_rule('/file/delete', view_func=FilesAPI.as_view('delete_file'), methods=['DELETE', 'OPTIONS'])
 
 # Flask Wrappers
 
@@ -39,7 +37,9 @@ def before_request_require_ssl():
 
 @app.before_request
 def before_request_authenticate():
-    # dont require auth just yet
+    #TODO Require some auth
+    if not app.config['DEBUG']:
+        logging.warn('You should consider adding in some security')
     return
 
     token = request.headers.get('X-Session-Token')
