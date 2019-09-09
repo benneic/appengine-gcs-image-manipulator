@@ -121,10 +121,10 @@ Submit the URL in the form from your browser or whatever mean necessary to keep 
 
 We can effect various image transformations by tacking strings onto the end of an App Engine blob-based image URL, following an = character. Options can be combined by separating them with hyphens, eg.:
 
-http://{dynamic_url}=s200-fh-p-b10-c0xFFFF0000
+https://{dynamic_url}=s200-fh-p-b10-c0xFFFF0000
 or:
 
-http://{dynamic_url}=s200-r90-cc-c0xFF00FF00-fSoften=1,20,0:
+https://{dynamic_url}=s200-r90-cc-c0xFF00FF00-fSoften=1,20,0:
 
 **NOTE MAX SIZE** is 1600px on longest size
 
