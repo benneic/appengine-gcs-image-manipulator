@@ -22,7 +22,7 @@ It demonstrates how to:
 
 # 1. Image upload workflow
 
-All requests below assume HTTPS and support HTTP/2
+In the production config all requests below assume HTTPS and support HTTP/2 but will allow HTTP in debug mode.
 
 ### Step 1: Get a signed upload URL
 
