@@ -4,13 +4,20 @@
 This API is a proof of concept to showcase how it is essentially possible to get free image transformations powered by the same services that powers Google Photos.
 
 It demonstrates how to:
-- do signed uploads direct from the client to a Google Cloud Storage bucket to optimise for speed (bypassing a webserver or middleware)
-- generate a dynamic url using the Google App Engine Images API
+- do [signed uploads](https://github.com/benneic/appengine-gcs-image-manipulator/blob/master/endpoints/utils.py#L32) direct from the client to a Google Cloud Storage bucket to optimise for speed (bypassing a webserver or middleware)
+- [generate a dynamic url](https://github.com/benneic/appengine-gcs-image-manipulator/blob/master/endpoints/gcs.py#L200-L205) using the Google App Engine Images API and the blobstore module
 
-**Uses**:
+**Demonstrates use of**:
 - Google Cloud Storage
-- Google App Engine with Images API
+- Google App Engine Standard Python 2.7 Images API
 - Flask
+
+For a background in the Image Transforms see here: https://cloud.google.com/appengine/docs/standard/python/images/
+
+## WARNING
+This demo is based on the App Engine standard API's only available in Python 2.7 which [ends of life Jan 1, 2020](https://pythonclock.org/) and currently unclear what support will exist in app engine after that.
+Also it's probably not a good idea to depend on the main list of image transformationsoptions below as they are undocumented.
+While this demo implements some concepts such as CORS and client/app secret keys that could allow it to be used in a production environment, use with caution as none of these has been tested.
 
 ## Table Of Contents
 1. Workflow for images
@@ -113,7 +120,7 @@ EXAMPLE RESPONSE
 }
 ```
 
-### Step 4: Save dynamic URL to you database
+### Step 4: Save dynamic URL to your database
 Submit the URL in the form from your browser or whatever mean necessary to keep a record of it.
 
 
@@ -310,11 +317,6 @@ Hence, I searched internet about JPEG types, and interestingly I've found some s
 I went trying the same v option on other image types, and found that WebP also supported the same kind of customized type, also progressively optimizing the image in weight and quality (but much lesser in quality than JPEG) in the same range between v0 and v3. Unfortunately, I haven't yet found any sources of different WebP types.
 
 Also, it didn't change anything when used on GIFs, but, as the PNG type, you can also combine its options with rj and v3, but you would (of course) lose the GIF animation and quality.
-
-## NOTE
-
-It's probably not a good idea to depend on any of these options existing forever. Google could remove most of them without notice at any time.
-So we should be prepared to update this stuff at a moments notice when things stop working.
 
 
 # 4. API Specification
