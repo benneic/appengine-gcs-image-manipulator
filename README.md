@@ -140,64 +140,63 @@ https://cloud.google.com/appengine/docs/standard/python/images/
 
 
 ## SIZE / CROP
-s640 — generates image 640 pixels on largest dimension
-s0 — original size image
-w100 — generates image 100 pixels wide
-h100 — generates image 100 pixels tall
-s (without a value) — stretches image to fit dimensions
-c — crops image to provided dimensions
-n — same as c, but crops from the center
-p — smart square crop, attempts cropping to faces
-pp — alternate smart square crop, does not cut off faces (?)
-cc — generates a circularly cropped image
-ci — square crop to smallest of: width, height, or specified =s parameter
-nu — no-upscaling. Disables resizing an image to larger than its original resolution.
+* s640 — generates image 640 pixels on largest dimension
+* s0 — original size image
+* w100 — generates image 100 pixels wide
+* h100 — generates image 100 pixels tall
+* s (without a value) — stretches image to fit dimensions
+* c — crops image to provided dimensions
+* n — same as c, but crops from the center
+* p — smart square crop, attempts cropping to faces
+* pp — alternate smart square crop, does not cut off faces (?)
+* cc — generates a circularly cropped image
+* ci — square crop to smallest of: width, height, or specified =s parameter
+* nu — no-upscaling. Disables resizing an image to larger than its original resolution.
 
 ## PAN AND ZOOM
-x, y, z: — pan and zoom a tiled image. These have no effect on an untiled image or without an authorization parameter of some form (see googleartproject.com).
+* x, y, z: — pan and zoom a tiled image. These have no effect on an untiled image or without an authorization parameter of some form (see googleartproject.com).
 
 ## ROTATION
-fv — flip vertically
-fh — flip horizontally
-r{90, 180, 270} — rotates image 90, 180, or 270 degrees clockwise
+* fv — flip vertically
+* fh — flip horizontally
+* r{90, 180, 270} — rotates image 90, 180, or 270 degrees clockwise
 
 ## IMAGE FORMAT
-rj — forces the resulting image to be JPG
-rp — forces the resulting image to be PNG
-rw — forces the resulting image to be WebP
-rg — forces the resulting image to be GIF
-v{0,1,2,3} — sets image to a different format option (works with JPG and WebP)
+* rj — forces the resulting image to be JPG
+* rp — forces the resulting image to be PNG
+* rw — forces the resulting image to be WebP
+* rg — forces the resulting image to be GIF
+* v{0,1,2,3} — sets image to a different format option (works with JPG and WebP)
 
 Forcing PNG, WebP and GIF outputs can work in combination with circular crops for a transparent background. Forcing JPG can be combined with border color to fill in backgrounds in transparent images.
 
 ## ANIMATED GIFs
-rh — generates an MP4 from the input image
-k — kill animation (generates static image)
+* rh — generates an MP4 from the input image
+* k — kill animation (generates static image)
 
 ## MISC.
-b10 — add a 10px border to image
-c0xAARRGGBB — set border color, eg. =c0xffff0000 for red
-d — adds header to cause browser download
-e7 — set cache-control max-age header on response to 7 days
-l100 — sets JPEG quality to 100% (1-100)
-h — responds with an HTML page containing the image
-g — responds with XML used by Google's pan/zoom
+* b10 — add a 10px border to image
+* c0xAARRGGBB — set border color, eg. =c0xffff0000 for red
+* d — adds header to cause browser download
+* e7 — set cache-control max-age header on response to 7 days
+* l100 — sets JPEG quality to 100% (1-100)
+* h — responds with an HTML page containing the image
+* g — responds with XML used by Google's pan/zoom
 
 ## Filters
-fSoften=1,100,0: - where 100 can go from 0 to 100 to blur the image
-fVignette=1,100,1.4,0,000000 where 100 controls the size of the gradient and 000000 is RRGGBB of the color of the border shadow
-fInvert=0,1 inverts the image regardless of the value provided
-fbw=0,1 makes the image black and white regardless of the value provided
-Unknown Parameters
+* fSoften=1,100,0: - where 100 can go from 0 to 100 to blur the image
+* fVignette=1,100,1.4,0,000000 where 100 controls the size of the gradient and 000000 is RRGGBB of the color of the border shadow
+* fInvert=0,1 inverts the image regardless of the value provided
+* fbw=0,1 makes the image black and white regardless of the value provided
+
+## Unknown Parameters
 These parameters have been seen in use, but their effect is unknown: no, nd, mv
 
 ## Caveats
 Some options (like =l for JPEG quality) do not seem to generate new images. If you change another option (size, etc.) and change the l value, the quality change should be visible. Some options also don't work well together. This is all undocumented by Google, probably with good reason.
 
-
 # 3. Full list of Dynamic URL Parameters
 
-**Note**
 ```
 bool   - means just add the variable by itself
 int    - means number after variable name
@@ -324,7 +323,6 @@ Also, it didn't change anything when used on GIFs, but, as the PNG type, you can
 
 ## GET /upload
 Images accepts file extensions: ['.webp','.jpg','.jpeg','.png','.gif']
-Files accepts file extensions: ['.pdf']
 
 ```
 curl https://appengine-gcs-image-manipulator.appspot.com/upload?filename=sample.jpeg
