@@ -15,8 +15,10 @@ It demonstrates how to:
 For a background in the Image Transforms see here: https://cloud.google.com/appengine/docs/standard/python/images/
 
 ## WARNING
-This demo is based on the App Engine standard API's only available in Python 2.7 which [ends of life Jan 1, 2020](https://pythonclock.org/) and currently unclear what support will exist in app engine after that.
+This demo is based on the App Engine standard API's only available in Python 2.7 which has an [EOL on Jan 1, 2020](https://pythonclock.org/) and currently unclear what support will exist in app engine after that.
+
 Also it's probably not a good idea to depend on the main list of image transformationsoptions below as they are undocumented.
+
 While this demo implements some concepts such as CORS and client/app secret keys that could allow it to be used in a production environment, use with caution as none of these has been tested.
 
 ## Table Of Contents
