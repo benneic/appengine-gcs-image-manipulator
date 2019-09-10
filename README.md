@@ -121,7 +121,7 @@ EXAMPLE RESPONSE
 ```
 
 ### Step 4: Save dynamic URL to your database
-Submit the URL in the form from your browser or whatever mean necessary to keep a record of it.
+Submit the URL in a form from your browser or whatever means necessary to keep a record of it. However calling the `/dynamic` will always return the same URL so you can safely request it again for the same cloud storage file, however this will use up your quotas and limits which is pointless.
 
 
 # 2. Intro to Dynamic URL parameters
